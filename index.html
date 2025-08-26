@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Poisson Disc Sampling with Multiple Sprites</title>
+<style>
+    html, body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: #111;
+        width: 100%;
+        height: 100%;
+    }
+    canvas {
+        display: block;
+    }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+const width = canvas.width;
+const height = canvas.height;
+
+const radius = 40;
+const k = 30;
+
+const cellSize = radius / Math.sqrt(2);
+const gridWidth = Math.ceil(width / cellSize);
+const gridHeight = Math.ceil(height / cellSize);
+const grid = Array.from({length: gridWidth}, () => Array(gridHeight).fill(null));
+
+const points = [];
+const active = [];
+
+const spriteList = [
+    'sprite_0.png',
+    'sprite_1.png',
+    'sprite_2.png',
+    'sprite_3.png',
+    'sprite_4.png'
+];
+
+// Preload images
+const sprites = [];
+let loadedCount = 0;
+
+spriteList.forEach(src => {
+    const img = new Image();
+    img.src = src;
+    img.onload = () => {
+        loadedCount++;
+        if (loadedCount === spriteList.length) {
+            init();
+            draw();
+        }
+    };
+    sprites.push(img);
+});
+
+// Initialize first point
+function init() {
+    const firstPoint = [
+        Math.random() * width,
+        Math.random() * height,
+        Math.random() * 2 * Math.PI,
+        sprites[Math.floor(Math.random() * sprites.length)]
+    ];
+    points.push(firstPoint);
+    active.push(firstPoint);
+    grid[Math.floor(firstPoint[0] / cellSize)][Math.floor(firstPoint[1] / cellSize)] = firstPoint;
+}
+
+// Generate new point
+function generate() {
+    if (active.length === 0) return false;
+
+    const idx = Math.floor(Math.random() * active.length);
+    const point = active[idx];
+
+    for (let i = 0; i < k; i++) {
+        const angle = Math.random() * 2 * Math.PI;
+        const r = radius * (1 + Math.random());
+        const newX = point[0] + r * Math.cos(angle);
+        const newY = point[1] + r * Math.sin(angle);
+
+        if (newX < 0 || newY < 0 || newX >= width || newY >= height) continue;
+
+        const gx = Math.floor(newX / cellSize);
+        const gy = Math.floor(newY / cellSize);
+        let ok = true;
+
+        for (let ix = Math.max(0, gx - 2); ix <= Math.min(gridWidth - 1, gx + 2); ix++) {
+            for (let iy = Math.max(0, gy - 2); iy <= Math.min(gridHeight - 1, gy + 2); iy++) {
+                const neighbor = grid[ix][iy];
+                if (neighbor) {
+                    const dx = neighbor[0] - newX;
+                    const dy = neighbor[1] - newY;
+                    if (Math.sqrt(dx*dx + dy*dy) < radius) ok = false;
+                }
+            }
+        }
+
+        if (ok) {
+            const newPoint = [
+                newX,
+                newY,
+                Math.random() * 2 * Math.PI,
+                sprites[Math.floor(Math.random() * sprites.length)]
+            ];
+            points.push(newPoint);
+            active.push(newPoint);
+            grid[gx][gy] = newPoint;
+            return true;
+        }
+    }
+
+    active.splice(idx, 1);
+    return true;
+}
+
+// Draw loop
+function draw() {
+    ctx.clearRect(0, 0, width, height);
+
+    points.forEach(p => {
+        const [x, y, angle, img] = p;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        ctx.drawImage(img, -16, -16, 32, 32);
+        ctx.restore();
+    });
+
+    if (generate()) {
+        requestAnimationFrame(draw);
+    } else {
+        console.log('Done! Total points:', points.length);
+    }
+}
+
+window.addEventListener('resize', () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+});
+</script>
+</body>
+</html>
